@@ -1,0 +1,86 @@
+{
+  "source": {
+    "status": "generated",
+    "label": "Official ESC2018 summary",
+    "version": "official_esc.gpkg",
+    "generated_at": "2026-03-28T08:15:15.656961+00:00",
+    "notes": "Generated locally from an official ESC dataset using the repo road corridor boundary.",
+    "esc_input": "data\\raw\\esc\\official_esc.gpkg",
+    "field": "ESC2018",
+    "corridor_boundary": "data\\road_corridor.geojson",
+    "area_crs": "EPSG:2193",
+    "forest_boundaries": ""
+  },
+  "classes": [
+    "Low",
+    "Medium",
+    "High",
+    "Very High"
+  ],
+  "scopes": {
+    "all": {
+      "percentages": [
+        2.1,
+        4.05,
+        93.85,
+        0.0
+      ],
+      "area_ha": [
+        1.906,
+        3.669,
+        85.009,
+        0.0
+      ],
+      "total_area_ha": 90.584,
+      "feature_count": 4,
+      "unknown_values": [],
+      "normalized_values": [
+        "High",
+        "Low",
+        "Medium"
+      ]
+    },
+    "hadley": {
+      "percentages": [
+        0.0,
+        12.56,
+        87.44,
+        0.0
+      ],
+      "area_ha": [
+        0.0,
+        3.669,
+        25.54,
+        0.0
+      ],
+      "total_area_ha": 29.209,
+      "feature_count": 2,
+      "unknown_values": [],
+      "normalized_values": [
+        "High",
+        "Medium"
+      ]
+    },
+    "plunkett": {
+      "percentages": [
+        3.11,
+        0.0,
+        96.89,
+        0.0
+      ],
+      "area_ha": [
+        1.906,
+        0.0,
+        59.469,
+        0.0
+      ],
+      "total_area_ha": 61.375,
+      "feature_count": 2,
+      "unknown_values": [],
+      "normalized_values": [
+        "High",
+        "Low"
+      ]
+    }
+  }
+}
