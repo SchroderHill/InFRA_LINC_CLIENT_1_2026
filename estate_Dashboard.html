@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>InFRA LINC Estate Dashboard</title>
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.9.3/mapbox-gl.css" rel="stylesheet">
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.9.3/mapbox-gl.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.6/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/geotiff@2.1.3/dist-browser/geotiff.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+  <link rel="stylesheet" href="estate_Dashboard.css">
+</head>
+<body>
+  <div class="dashboard-container">
+    <div class="dashboard-header">
+      <div class="dashboard-header-inner">
+        <div>
+          <h1>Infrastructure Monitoring Dashboard</h1>
+        </div>
+        <div class="dashboard-logo-wrap" aria-label="Brand logo">
+          <img class="dashboard-logo" src="./mnr_Crop.PNG" alt="M&R logo">
+        </div>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filter-group">
+        <label for="monthFilter">Filter by month:</label>
+        <select id="monthFilter">
+          <option value="all">All months</option>
+        </select>
+        <label for="forestFilter">Filter by forest:</label>
+        <select id="forestFilter">
+          <option value="all">All forests</option>
+        </select>
+        <div class="kmz-reference-control">
+          <label>Date range:</label>
+          <div class="kmz-dual-slider">
+            <div class="kmz-dual-slider__track" id="kmzSliderTrack"></div>
+            <input id="kmzReferenceSlider" type="range" min="0" max="0" value="0" step="1" disabled>
+            <input id="kmzCutoffSlider" type="range" min="0" max="0" value="0" step="1" disabled>
+          </div>
+          <output id="kmzReferenceDateValue">Awaiting displacement threshold</output>
+        </div>
+        <div class="kmz-threshold-control">
+          <label for="kmzThresholdSelect">Displacement threshold:</label>
+          <select id="kmzThresholdSelect" disabled>
+            <option value="bottom10">Lowest 10%</option>
+            <option value="bottom25" selected>Lowest 25%</option>
+            <option value="bottom50">Lowest 50%</option>
+            <option value="all">All points</option>
+          </select>
+        </div>
+      </div>
+      <div class="toolbar-actions">
+        <button id="sentinelToggleBtn" class="secondary-button" type="button">Sentinel Imagery: Off</button>
+        <button id="downloadPdfBtn" type="button">Generate Report PDF</button>
+      </div>
+    </div>
+
+    <div class="stats-bar">
+      <div class="stat-card">
+        <h2>Active Forest</h2>
+        <p id="activeForestValue">--</p>
+      </div>
+      <div class="stat-card">
+        <h2>Active Month</h2>
+        <p id="activePeriodValue">--</p>
+      </div>
+      <div class="stat-card">
+        <h2>Monitored Area</h2>
+        <p id="monitoredAreaValue">--</p>
+      </div>
+      <div class="stat-card">
+        <h2>Max |LOS| Velocity</h2>
+        <p id="maxDisplacementValue">Awaiting data</p>
+      </div>
+    </div>
+
+    <div class="main-row">
+      <div class="charts-stack">
+        <div class="chart-section">
+          <div class="section-heading">
+            <h3>Displacement Time Series</h3>
+            <p id="kmzTimeSeriesStat" class="chart-stat-display"></p>
+            <p id="kmzTimeSeriesNote" class="section-note">Hover over a displacement threshold point to preview displacement relative to the selected reference date, or click to lock the point.</p>
+          </div>
+          <div class="chart-container chart-container--tall">
+            <canvas id="kmzTimeSeriesChart"></canvas>
+          </div>
+        </div>
+
+        <div class="chart-section">
+          <div class="section-heading">
+            <h3>Regional Rainfall Totals</h3>
+            <p id="rainfallLocationNote" class="section-note">Modelled monthly rainfall totals from the Open-Meteo API<br>Map centre coordinates will appear here.</p>
+          </div>
+          <div class="chart-container">
+            <canvas id="lineChart"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="map-section">
+        <div class="section-heading">
+          <h3>Map Overview</h3>
+          <p id="mapSelectionNote" class="section-note">Generic basemap is the default. Sentinel imagery is available as an overlay toggle.</p>
+        </div>
+        <div class="map-shell">
+          <div class="kmz-legend" aria-label="Displacement threshold point velocity legend">
+            <p class="kmz-legend-title">Displacement Threshold Point Velocity</p>
+            <p class="kmz-legend-subtitle">LOS velocity cm/year</p>
+            <div class="kmz-legend-items">
+              <div class="kmz-legend-item">
+                <span class="kmz-swatch kmz-swatch-low" aria-hidden="true"></span>
+                <span>-8 cm/yr</span>
+              </div>
+              <div class="kmz-legend-item">
+                <span class="kmz-swatch kmz-swatch-medium" aria-hidden="true"></span>
+                <span>0 cm/yr</span>
+              </div>
+              <div class="kmz-legend-item">
+                <span class="kmz-swatch kmz-swatch-high" aria-hidden="true"></span>
+                <span>+8 cm/yr</span>
+              </div>
+            </div>
+          </div>
+          <div id="dashboardMap"></div>
+        </div>
+        <div id="mapStatus" class="map-status"></div>
+      </div>
+    </div>
+
+    <div class="bottom-row">
+      <details id="rasterLibraryPanel" class="dataset-panel">
+        <summary class="dataset-panel-summary">
+          <div>
+            <h3>Raster Library</h3>
+            <p id="datasetSummaryText" class="section-note">Raster catalog metadata is available here when needed, but kept collapsed to reduce dashboard clutter.</p>
+          </div>
+          <span class="dataset-panel-hint">Show catalog</span>
+        </summary>
+        <div id="datasetCards" class="dataset-grid"></div>
+      </details>
+    </div>
+  </div>
+
+  <div id="rasterCanvasHost" aria-hidden="true"></div>
+
+  <div id="reportModal" class="modal-overlay" style="display:none;" role="dialog" aria-modal="true" aria-label="Generate PDF Report">
+    <div class="modal-panel">
+      <div class="modal-header">
+        <h2>Generate PDF Report</h2>
+        <button class="modal-close" id="modalClose" title="Close">&#x2715;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-cols">
+          <div class="modal-col-map">
+            <p class="modal-section-title" style="margin-top:0;">Map Image</p>
+            <p class="modal-helper-copy">The current dashboard map is used by default. Click the preview to upload a manual replacement.</p>
+            <div class="map-upload-area" id="mapUploadArea">
+              <input type="file" id="mapImageInput" accept="image/*">
+              <div class="upload-placeholder" id="uploadPlaceholder">
+                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 0.5rem;display:block;">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <p>Click to upload map image</p>
+                <p class="muted-copy">PNG or JPG</p>
+              </div>
+              <img id="mapPreview" alt="Map preview">
+            </div>
+            <p id="mapImageSourceNote" class="modal-helper-copy map-image-source-note">Using current dashboard map canvas.</p>
+            <button class="btn-clear-map" id="clearMapBtn" type="button">Use dashboard map canvas</button>
+
+            <p class="modal-section-title">Site Photo (Optional)</p>
+            <p class="modal-helper-copy">Upload a field photo to place inside a dedicated site photo panel on page 1 of the PDF report.</p>
+            <div class="map-upload-area" id="photoUploadArea">
+              <input type="file" id="reportPhotoInput" accept="image/*">
+              <div class="upload-placeholder" id="photoUploadPlaceholder">
+                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin:0 auto 0.5rem;display:block;">
+                  <rect x="3" y="4" width="18" height="16" rx="2" ry="2"/>
+                  <circle cx="9" cy="10" r="1.6"/>
+                  <polyline points="3 16 8.5 11.5 12.5 14.5 16.5 10.5 21 14.5"/>
+                </svg>
+                <p>Click to upload site photo</p>
+                <p class="muted-copy">PNG or JPG</p>
+              </div>
+              <img id="photoPreview" alt="Site photo preview">
+            </div>
+            <button class="btn-clear-map" id="clearPhotoBtn" type="button">Remove site photo</button>
+          </div>
+
+          <div class="modal-col-fields">
+            <p class="modal-section-title" style="margin-top:0;">Dashboard Summary</p>
+            <div class="fields-grid">
+              <div class="field-group">
+                <label>Forest</label>
+                <input type="text" id="rpt_forest" class="field-readonly" readonly tabindex="-1">
+              </div>
+              <div class="field-group">
+                <label>Reporting Month</label>
+                <input type="text" id="rpt_month" class="field-readonly" readonly tabindex="-1">
+              </div>
+              <div class="field-group">
+                <label>Max LOS Velocity (cm/yr)</label>
+                <input type="text" id="rpt_max_velocity" class="field-readonly" readonly tabindex="-1">
+              </div>
+              <div class="field-group">
+                <label>Max Relative Displacement</label>
+                <input type="text" id="rpt_remediated" class="field-readonly" readonly tabindex="-1">
+              </div>
+              <div class="field-group">
+                <label>Monthly Rainfall</label>
+                <input type="text" id="rpt_rainfall" class="field-readonly" readonly tabindex="-1">
+              </div>
+              <div class="field-group">
+                <label>Max 24hr Rainfall (mm)</label>
+                <input type="number" id="rpt_max24hr" placeholder="e.g. 29" min="0">
+              </div>
+              <div class="field-group">
+                <label>High Res Raster Layer</label>
+                <input type="text" id="rpt_watching" class="field-readonly" readonly tabindex="-1">
+              </div>
+              <div class="field-group">
+                <label>Active Layers</label>
+                <input type="text" id="rpt_total" class="field-readonly" readonly tabindex="-1">
+              </div>
+              <div class="field-group">
+                <label>Selection Scope</label>
+                <input type="text" id="rpt_recurring" class="field-readonly" readonly tabindex="-1">
+              </div>
+            </div>
+
+            <p class="modal-section-title">Spatial &amp; Coverage</p>
+            <div class="fields-grid">
+              <div class="field-group">
+                <label>Monitored Area (ha)</label>
+                <input type="text" id="rpt_area" class="field-readonly" readonly tabindex="-1" placeholder="—">
+              </div>
+              <div class="field-group">
+                <label>Satellite Revisits</label>
+                <input type="number" id="rpt_sat_revisits" class="field-readonly" readonly tabindex="-1" placeholder="—" min="0">
+              </div>
+              <div class="field-group">
+                <label>Avg Revisit Interval (days)</label>
+                <input type="number" id="rpt_sat_interval" class="field-readonly" readonly tabindex="-1" placeholder="—" min="0">
+              </div>
+              <div class="field-group">
+                <label>Radar Coherence (0-1)</label>
+                <input type="number" step="0.01" id="rpt_sat_coherence" class="field-readonly" readonly tabindex="-1" min="0" max="1">
+              </div>
+            </div>
+
+            <p class="modal-section-title">Site Notes</p>
+            <div class="fields-grid">
+              <div class="field-group">
+                <label>Site Visits Recorded</label>
+                <select id="rpt_sitevisits">
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                  <option value="Planned">Planned</option>
+                </select>
+              </div>
+              <div class="field-group">
+                <label>Remediation Recorded</label>
+                <select id="rpt_remediationrecorded">
+                  <option value="Yes">Yes</option>
+                  <option value="No">No</option>
+                  <option value="Planned">Planned</option>
+                </select>
+              </div>
+            </div>
+
+            <button type="button" class="optional-toggle" id="optionalToggle">▼ Optional details</button>
+            <div id="optionalSection" style="display:none;">
+              <div class="field-group field-group--full">
+                <label>Field Notes</label>
+                <textarea id="rpt_notes" rows="3" placeholder="Enter field observations, site visit notes, or comments to include in the report..."></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <span class="modal-status" id="modalStatus"></span>
+        <button class="btn-modal-cancel" id="modalCancelBtn" type="button">Cancel</button>
+        <button class="btn-generate" id="generatePdfBtn" type="button">&#8681; Generate PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="estate_Dashboard.js"></script>
+</body>
+</html>
